@@ -1,0 +1,123 @@
+;;;;;;;;;;;;;;;;
+;; INTERFACE: ;;
+;;;;;;;;;;;;;;;;
+;; (cur-temp) produces the current temperature at the 
+;;   Univerisity of Waterloo in Celsius
+;; cur-temp : Void -> Num
+
+;; (course-desc subject catalog) consumes a subject and 
+;;   a catalog number and produces a string with the   
+;;   calendar "description" of the course
+;; course-desc : Str Int -> Str
+;;   requires : subject should be a non-empty string
+
+;; (total-parking-capacity) produces the total parking 
+;;   capacity of the university (for the lots provided ;;   by the API)
+;; total-parking-capacity : Void -> Nat
+
+;; (lookup key al) looks up key in the asscociation list al and produces
+;;   the correspondinf value or #f if not found
+;; lookup: (listof (list Any Any)) Key -> Any
+
+;; (build- api-url term subject catalog) builds the string:
+;;   "/terms/term/subject/catalog/schedule"
+;; build-api-url: Nat Str Nat -> Str
+
+;; (course-capacity term subject catalog) consumes 
+;;   term, subject and catalog and produces a list of 
+;;   lists illustrating how "full" a course is
+;; course-capacity : Int Str Int -> (listof Str)
+;;   requires : term should be a 4 digit integer
+;;              subject should be a non-empty string
+
+
+;;;;;;;;;;;;;;;;;;;;;
+;; IMPLEMENTATION: ;;
+;;;;;;;;;;;;;;;;;;;;;
+(define api-url-1 (uw-api "/weather/current"))
+(define api-url (uw-api "/parking/watpark"))
+
+(define (cur-temp)
+  
+  ;; (find-temperature list-1) consumes list-1 and         
+  ;;   produces the temperature at Univeristy of           
+  ;;   Waterloo in degree Celsius
+  ;; find-temperature : APIResult -> Num 
+  (define (find-temperature list-1)
+
+    (cond
+     [(string=? "temperature_current_c" (first (first list-1)))
+      (second (first list-1))]
+     [else (find-temperature (rest list-1))]))
+
+  (find-temperature api-url-1))
+
+;; ********************************************************************
+
+(define (course-desc subject catalog)
+  
+  ;; (find-course list-1) consumes list-1 and produces     
+  ;;   the calendar course "description" of the           
+  ;;   appropriate course   
+  ;; find-course : APIResult -> Str
+  (define (find-course list-1)
+
+    (cond
+     [(string=? "description"
+                (first (first list-1)))
+      (second (first list-1))]
+     [else (find-course (rest list-1))]))
+
+  (find-course (uw-api (string-append "/courses/" subject "/" 
+                                      (number->string catalog)))))
+
+;; ********************************************************************
+
+
+(define (total-parking-capacity)
+
+  ;; (lot-parking list-inner) consumes list-inner and     
+  ;;   produces the parking capacity of a paticular lot
+  ;; lot-parking: (first APIResult) -> Nat
+  (define (lot-parking list-inner)
+
+    (cond
+     [(empty? list-inner) empty]
+     [(string=? "capacity" (first (first list-inner)))
+      (second (first list-inner))]
+     [else (lot-parking (rest list-inner))]))
+
+  ;; (total-slots list-outer) takes list-outer and 
+  ;;    produces the total parking capacity of all the     
+  ;;    lots in the University
+  ;; total-slots : APIResult -> Nat 
+  (define (total-slots list-outer)
+
+    (cond
+     [(empty? list-outer) 0]
+     [else (+ (lot-parking (first list-outer))
+              (total-slots  (rest list-outer)))]))
+
+  (total-slots api-url))
+
+;; ********************************************************************
+
+
+(define (lookup key al)
+ (define result (assoc key al))
+ (cond [(cons? result) (second result)]
+       [else #f]))
+
+(define (build-api-url term sybject catalog)
+ (string-append "/terms/" (number -> string term) "/" subject 
+                "/" (number -> string catalog) "/schedule")) 
+
+(define (course-capacity term subject catalog)
+ (define course_schedule (uw-api (build-api-url term subject)))
+ (define n (map (lambda (k) (list (lookup "section" k)
+                                  (lookup "enrollment_capacity" k)
+                                  (lookup "enrollment_total" k))) 
+                                   course_schedule))
+ (filter (lambda (s) (string=? "LEC"  (substring (first c) 0 3))) n))                                
+
+
